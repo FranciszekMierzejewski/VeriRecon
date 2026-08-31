@@ -27,7 +27,7 @@ def generate_fake_po_ref(real_po_refs: set[str], year: int = 2026) -> str:
     """Generate PO reference that does not exist in our real PO references, using their same format to avoid bias."""
 
     while True:
-        candidate = f"PO-{year}{random.randint(10000, 99999)}"
+        candidate = f"PO-{year}{random.randint(1000, 9999)}"
 
         if candidate not in real_po_refs:
             return candidate
@@ -56,8 +56,8 @@ def generate_purchase_order(n: int = 25) -> list[dict[str, Any]]:
         line_content = [
             {
                 "description" : f"Item {j}",
-                "quantity" : (quantity := random.randint(1, 300)),
-                "unit_price" : (unit_price := round(random.uniform(5, 2000), 2)),
+                "quantity" : (quantity := random.randint(1, 50)),
+                "unit_price" : (unit_price := round(random.uniform(5, 500), 2)),
                 "line_total" : round(quantity * unit_price, 2) 
             }
             for j in range(number_of_lines)
@@ -118,7 +118,7 @@ def generate_vendor_history(suppliers: list[str]) -> dict[str, dict[str, Any]]:
     return vendor_history
 
 
-def generate_invoices_with_discrepancies(purchase_order_list: list[dict[str, Any]], count: int = 10) -> list[dict[str, Any]]:
+def generate_invoices_with_discrepancies(purchase_order_list: list[dict[str, Any]], count: int = 11) -> list[dict[str, Any]]:
     """
     Generates invoices with planted discrepancies with range of results
         1. Clean Match = Auto approve
@@ -128,11 +128,23 @@ def generate_invoices_with_discrepancies(purchase_order_list: list[dict[str, Any
     """
 
     invoice_list: list[dict[str, Any]] = []
-    real_po_refs = {po['reference'] for po in purchase_order_list}
+    real_po_refs = {po["reference"] for po in purchase_order_list}
     used_invoice_numbers: set[str] = set()
+    pos_needed = 4 + 3 + 1  # case1 + case2 + case4 (case4 needs 1 PO for its pair)
+
+    if len(purchase_order_list) < pos_needed:
+        raise ValueError(
+            f"Need at least {pos_needed} purchase orders to generate all "
+            f"discrepancy cases without PO reuse, got {len(purchase_order_list)}."
+        )
+    
+    sampled_pos = random.sample(purchase_order_list, pos_needed)
+    case1_pos = sampled_pos[:4]
+    case2_pos = sampled_pos[4:7]
+    case4_po = sampled_pos[7]
 
     # Case 1, 4 clean matches
-    for purchase_order in random.sample(purchase_order_list, 4):
+    for purchase_order in case1_pos:
         invoice_list.append({
             "invoice_number": generate_unique_invoice_number(used_invoice_numbers),
             "supplier": purchase_order["supplier"],
@@ -143,8 +155,8 @@ def generate_invoices_with_discrepancies(purchase_order_list: list[dict[str, Any
             "expected_classification": "Auto Approve"
         })
 
-    # Case 2, 3 minor price variations
-    for purchase_order in random.sample(purchase_order_list, 3):
+    # Case 2, 3 minor price variations overbilling
+    for purchase_order in case2_pos:
         variance_pct = random.uniform(0.02, 0.05)
         # direction = random.choice(["-", "+"])
         invoice_amount = round(purchase_order['total'] * (1 + variance_pct), 2) # 1 way, fraud detection
@@ -165,7 +177,7 @@ def generate_invoices_with_discrepancies(purchase_order_list: list[dict[str, Any
         })
 
 
-    # Case 3, 2 non-matching purchase orders
+    # Case 3, 3 non-matching purchase orders
     for _ in range(2):
         invoice_list.append({
             "invoice_number": generate_unique_invoice_number(used_invoice_numbers), 
@@ -178,7 +190,8 @@ def generate_invoices_with_discrepancies(purchase_order_list: list[dict[str, Any
         })
 
     # Case 4, 1 dupe invoice
-    duplicate_purchase_order = random.choice(purchase_order_list) # random selection from list
+    # Note on bug fix, replaced random so cannot reuse a PO already used in cases 1 and 2
+    duplicate_purchase_order = case4_po
     duplicate_amount = duplicate_purchase_order['total']
     duplicate_date = datetime.now().strftime('%d/%m/%Y')
 
@@ -194,7 +207,16 @@ def generate_invoices_with_discrepancies(purchase_order_list: list[dict[str, Any
         })
 
     random.shuffle(invoice_list) # shuffle to avoid bias of order
-    return invoice_list[:count] if count < len(invoice_list) else invoice_list # count > 10 = return 10 len else < 10 len
+
+    # Note on bug fix: replaced slicing after shuffling, as cuts half of duplicate pair if count < 11. Instead raise.
+    if count < len(invoice_list):
+        raise ValueError(
+            f"count={count} is less than the {len(invoice_list)} invoices "
+            "required to represent all planted discrepancy cases (including "
+            "the duplicate pair). Increase count instead of truncating."
+        )
+
+    return invoice_list
 
 
 def seed_firestore(purchase_order_list: list[dict[str, Any]], vendor_history: dict[str, dict[str, Any]]) -> None:
@@ -213,7 +235,9 @@ def seed_firestore(purchase_order_list: list[dict[str, Any]], vendor_history: di
         ref = database.collection("vendor_history").document(document_id)
         batch.set(ref, stats)
 
-    batch.commit()
+    write_results = batch.commit()
+    print(f"Batch commit returned {len(write_results)} write results") # bug fix note: diagnostic on write result logs
+    print(f"First write result update_time: {write_results[0].update_time}")
 
     print(f"Seeded {len(purchase_order_list)} purchase orders")
     print(f"Seeded {len(vendor_history)} vendor history records")
@@ -222,7 +246,7 @@ def seed_firestore(purchase_order_list: list[dict[str, Any]], vendor_history: di
 if __name__ == "__main__":
     po_list = generate_purchase_order(25)
     vendor_hist = generate_vendor_history(SUPPLIERS)
-    invoice_list = generate_invoices_with_discrepancies(po_list, count=10)
+    invoice_list = generate_invoices_with_discrepancies(po_list, count=11)
 
     seed_firestore(po_list, vendor_hist)
 
