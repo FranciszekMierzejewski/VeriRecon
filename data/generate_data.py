@@ -2,9 +2,10 @@ import json
 import random
 from typing import Any
 from datetime import datetime, timedelta
-from google.cloud import firestore
 
-database = firestore.Client(project='verirecon-hackathon')
+from db.firestore_client import get_client
+
+database = get_client()
 
 SUPPLIERS = [
     "HGV Direct Ltd",
@@ -228,7 +229,7 @@ if __name__ == "__main__":
     with open("data/demo_invoices.json", "w") as f:
         json.dump(invoice_list, f, indent=2)
 
-    print(f"Generated {len(invoice_list)} demo invoices -> data/demo_invoices.json")
+    print(f"Generated {len(invoice_list)} demo invoices to data/demo_invoices.json")
     print("\nExpected classifications:")
     for invoice in invoice_list:
         print(f"  {invoice['invoice_number']}: {invoice['expected_classification']}")
