@@ -143,9 +143,14 @@ def _infer_mime_type(file_path: Path) -> str:
 
 if __name__ == "__main__":
     # Quick manual test against a sample file in data/sample_pdfs/
-    sample_path = Path("data/sample_pdfs/INV-86669.pdf")
-    if sample_path.exists():
-        result = extract_invoice_from_file(sample_path)
-        print(json.dumps(result, indent=2))
+
+    sample_directory = Path("data/sample_pdfs")
+    pdf_files = list(sample_directory.iterdir())
+
+    if not pdf_files:
+        print(f"No sample file found at {sample_directory} — add one to test extraction.")
     else:
-        print(f"No sample file found at {sample_path} — add one to test extraction.")
+        for sample_path in pdf_files:
+            print(sample_path.name)
+            result = extract_invoice_from_file(sample_path)
+            print(json.dumps(result, indent = 2), "\n")
