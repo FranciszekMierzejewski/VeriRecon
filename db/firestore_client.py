@@ -23,3 +23,11 @@ def get_client() -> firestore.Client:
     if _client is None:
         _client = firestore.Client(project = PROJECT_ID)
     return _client
+
+
+def sanitise_document_id(name: str) -> str:
+    """
+    Convert supplier name into a document ID safe for Firestore, to prevent mismatches that actually should work.
+    """
+
+    return name.replace(" ", "_").replace("&", "and")

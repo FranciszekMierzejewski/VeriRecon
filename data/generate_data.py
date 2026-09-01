@@ -3,7 +3,7 @@ import random
 from typing import Any
 from datetime import datetime, timedelta
 
-from db.firestore_client import get_client
+from db.firestore_client import get_client, sanitise_document_id
 
 database = get_client()
 
@@ -107,7 +107,7 @@ def generate_vendor_history(suppliers: list[str]) -> dict[str, dict[str, Any]]:
 
         vendor_history[supplier] = {
             "supplier" : supplier,
-            "average_income_amount" : average_invoice_amount,
+            "average_invoice_amount" : average_invoice_amount,
             "invoice_count" : invoice_count,
             "past_flags_count" : random.randint(0,4),
             "ytd_spend" : round(average_invoice_amount * invoice_count * random.uniform(0.8, 1.2), 2),
@@ -231,7 +231,7 @@ def seed_firestore(purchase_order_list: list[dict[str, Any]], vendor_history: di
         batch.set(ref, purchase_order)
 
     for supplier, stats in vendor_history.items():
-        document_id = supplier.replace(" ", "_").replace("&", "and")
+        document_id = sanitise_document_id(supplier)
         ref = database.collection("vendor_history").document(document_id)
         batch.set(ref, stats)
 
