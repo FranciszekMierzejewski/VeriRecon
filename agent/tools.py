@@ -6,6 +6,8 @@ ADK agent calls each function independently, with their results they are logged 
 from datetime import datetime
 from typing import Any
 
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 from db.firestore_client import get_client, sanitise_document_id
 
 database = get_client()
@@ -114,9 +116,9 @@ def check_exact_duplicate(supplier: str, invoice_amount: float, invoice_date: st
 
     query = (
         database.collection("processed_invoices")
-        .where("supplier", "==", supplier)
-        .where("invoice_amount", "==", invoice_amount)
-        .where("date", "==", invoice_date)
+        .where(filter=FieldFilter("supplier", "==", supplier))
+        .where(filter=FieldFilter("invoice_amount", "==", invoice_amount))
+        .where(filter=FieldFilter("date", "==", invoice_date))
     )
 
     matches = list(query.stream())
@@ -154,7 +156,9 @@ def check_fuzzy_duplicates(
             "error": f"could not parse invoice_date '{invoice_date}' as DD/MM/YYYY",
         }
 
-    query = database.collection("processed_invoices").where("supplier", "==", supplier)
+    query = database.collection("processed_invoices").where(
+        filter=FieldFilter("supplier", "==", supplier)
+    )
     candidates = list(query.stream())
 
     fuzzy_matches: list[dict[str, Any]] = []
