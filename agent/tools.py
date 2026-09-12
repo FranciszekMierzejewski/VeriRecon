@@ -99,6 +99,57 @@ def compute_variance(invoice_amount: float, po_amount: float, tolerance_gbp: flo
     }
 
 
+def verify_invoice_arithmetic(
+    invoice_amount: float,
+    subtotal: float | None = None,
+    tax_amount: float | None = None,
+    shipping_cost: float | None = None,
+    other_charges: float | None = None,
+    tolerance_gbp: float = 5.0,
+) -> dict[str, Any]:
+    """
+    Check whether an invoice's own stated breakdown (subtotal + tax +
+    shipping + other charges) actually sums to its stated invoice_amount.
+
+    This is independent of PO matching, it catches internal arithmetic
+    inconsistency on the invoice itself (e.g. inflated VAT or padded
+    shipping that wouldn't show up as a line-item price change), which
+    compute_variance cannot detect since it only compares against the PO.
+
+    All breakdown fields are optional since not every invoice itemizes
+    them separately. Missing fields are treated as 0 in the sum, and
+    fields_provided reports which ones were actually available, so the
+    agent can weigh a full breakdown differently from a partial one.
+    """
+
+    fields = {
+        "subtotal": subtotal,
+        "tax_amount": tax_amount,
+        "shipping_cost": shipping_cost,
+        "other_charges": other_charges,
+    }
+    fields_provided = [name for name, value in fields.items() if value is not None]
+
+    if not fields_provided:
+        return {
+            "checked": False,
+            "reason": "No breakdown fields (subtotal, tax_amount, shipping_cost, other_charges) were provided",
+        }
+
+    computed_total = sum(value for value in fields.values() if value is not None)
+    absolute_diff = round(invoice_amount - computed_total, 2)
+    is_consistent = abs(absolute_diff) <= tolerance_gbp
+
+    return {
+        "checked": True,
+        "fields_provided": fields_provided,
+        "computed_total": round(computed_total, 2),
+        "invoice_amount": invoice_amount,
+        "abs_difference": absolute_diff,
+        "is_consistent": is_consistent,
+    }
+
+
 def _parse_invoice_date(date_str: str) -> datetime | None:
     """
     Previously only candidate dates were guarded with try/except, so the

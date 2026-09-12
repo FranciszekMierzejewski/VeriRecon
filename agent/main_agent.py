@@ -28,7 +28,8 @@ SYSTEM_PROMPT = """
 You are an invoice reconciliation agent for a UK HGV/truck parts business.
 
 For each invoice you are given (supplier, po_reference, invoice_amount,
-currency, date), use your tools to verify it before deciding anything.
+currency, date, and optionally subtotal, tax_amount, shipping_cost,
+other_charges), use your tools to verify it before deciding anything.
 Never guess or assume a PO's amount, status, or existence — always call
 lookup_po first.
 
@@ -40,11 +41,17 @@ Decision logic:
 - Always call check_exact_duplicate and check_fuzzy_duplicates regardless
   of the PO outcome — a valid PO does not rule out the same invoice being
   submitted twice.
+- Always call verify_invoice_arithmetic using the invoice's subtotal,
+  tax_amount, shipping_cost, and other_charges (pass 0 for any field not
+  shown on the invoice) — this checks the invoice's own numbers are
+  internally consistent, independent of whether it matches the PO.
 - Optionally call get_vendor_history for extra context.
 
 Classify as:
-- "Auto Approve": PO found, within_tolerance is True, no duplicates.
-- "Flag For Review": PO found, NOT within_tolerance, not a duplicate.
+- "Auto Approve": PO found, within_tolerance is True, no duplicates,
+  and (if checked) the invoice's arithmetic is consistent.
+- "Flag For Review": PO found, NOT within_tolerance, not a duplicate,
+  OR the invoice's arithmetic is inconsistent but no other issue found.
 - "Escalate": PO not found, OR is_duplicate/is_fuzzy_duplicate is True.
 
 Respond with ONLY a single JSON object, no other text, in this exact form:
@@ -52,9 +59,10 @@ Respond with ONLY a single JSON object, no other text, in this exact form:
   "decision": "Auto Approve" | "Flag For Review" | "Escalate",
   "confidence": <float 0.0-1.0>,
   "reasoning": "<2-3 sentence plain-English explanation>",
-  "flags": ["<short flag strings, e.g. 'no_po', 'price_variance', 'duplicate'>"]
+  "flags": ["<short flag strings, e.g. 'no_po', 'price_variance', 'duplicate', 'arithmetic_inconsistent'>"]
 }
 """.strip()
+
 
 def _make_logging_tools(invoice_number: str) -> list[Any]:
     """
@@ -114,7 +122,31 @@ def _make_logging_tools(invoice_number: str) -> list[Any]:
         )
         return result
 
-    return [lookup_po, get_vendor_history, compute_variance, check_exact_duplicate, check_fuzzy_duplicates]
+    def verify_invoice_arithmetic(
+        invoice_amount: float,
+        subtotal: float,
+        tax_amount: float,
+        shipping_cost: float,
+        other_charges: float) -> dict[str, Any]:
+        """Check whether an invoice's stated subtotal, tax, shipping, and other charges sum to its invoice_amount."""
+
+        result = recon_tools.verify_invoice_arithmetic(
+            invoice_amount, subtotal, tax_amount, shipping_cost, other_charges
+        )
+        _log(
+            "verify_invoice_arithmetic",
+            {
+                "invoice_amount": invoice_amount,
+                "subtotal": subtotal,
+                "tax_amount": tax_amount,
+                "shipping_cost": shipping_cost,
+                "other_charges": other_charges,
+            },
+            result,
+        )
+        return result
+
+    return [lookup_po, get_vendor_history, compute_variance, check_exact_duplicate, check_fuzzy_duplicates, verify_invoice_arithmetic]
 
 
 def _build_agent(invoice_number: str) -> LlmAgent:

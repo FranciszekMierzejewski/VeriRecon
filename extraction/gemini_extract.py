@@ -51,6 +51,26 @@ INVOICE_RESPONSE_SCHEMA: dict[str, Any] = {
             "nullable": True,
             "description": "Purchase order number referenced on the invoice, if present"
         },
+        "subtotal": {
+            "type": "number",
+            "nullable": True,
+            "description": "Sum of line items before tax and additional charges, if stated on the invoice"
+        },
+        "shipping_cost": {
+            "type": "number",
+            "nullable": True,
+            "description": "Shipping or delivery charge, if stated separately on the invoice"
+        },
+        "other_charges": {
+            "type": "number",
+            "nullable": True,
+            "description": "Any other additional charges stated separately, if present"
+        },
+        "tax_amount": {
+            "type": "number",
+            "nullable": True,
+            "description": "VAT/tax amount, if stated separately on the invoice"
+        },
         "invoice_amount": {
             "type": "number",
             "description": "Total amount due, including tax and charges"
@@ -85,6 +105,14 @@ Extract only the values found in the document. Do not infer, guess, or
 normalise values beyond what is explicitly stated. If a field (e.g.
 po_reference) is not present on the invoice, return null for it rather
 than guessing.
+
+Critical: extract tax_amount, subtotal, shipping_cost, and other_charges
+exactly as printed on the invoice, even if they appear mathematically
+inconsistent with the invoice's stated total or with each other. Do not
+recalculate, correct, or infer any of these values — for example, if
+VAT is labeled "20%" but the printed amount does not equal 20% of the
+subtotal, extract the printed amount as-is. Your job is transcription,
+not verification; arithmetic consistency is checked separately downstream.
 
 Return the invoice date in DD/MM/YYYY format.
 """.strip()
