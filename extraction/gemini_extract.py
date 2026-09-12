@@ -31,7 +31,7 @@ def get_genai_client() -> genai.Client:
             vertexai=True,
             project=PROJECT_ID,
             location=LOCATION,
-            http_options=HttpOptions(api_version="v1"),
+            http_options=HttpOptions(api_version="v1")
         )
     return _client
 
@@ -49,16 +49,16 @@ INVOICE_RESPONSE_SCHEMA: dict[str, Any] = {
         "po_reference": {
             "type": "string",
             "nullable": True,
-            "description": "Purchase order number referenced on the invoice, if present",
+            "description": "Purchase order number referenced on the invoice, if present"
         },
         "invoice_amount": {
             "type": "number",
-            "description": "Total amount due, including tax and charges",
+            "description": "Total amount due, including tax and charges"
         },
         "currency": {"type": "string"},
         "date": {
             "type": "string",
-            "description": "Invoice date in DD/MM/YYYY format",
+            "description": "Invoice date in DD/MM/YYYY format"
         },
         "line_items": {
             "type": "array",
@@ -68,7 +68,7 @@ INVOICE_RESPONSE_SCHEMA: dict[str, Any] = {
                     "description": {"type": "string"},
                     "quantity": {"type": "number"},
                     "unit_price": {"type": "number"},
-                    "line_total": {"type": "number"},
+                    "line_total": {"type": "number"}
                 },
                 "required": ["description", "quantity", "unit_price", "line_total"],
             },
@@ -114,7 +114,7 @@ def extract_invoice_from_file(file_path: str | Path) -> dict[str, Any]:
         contents=[document_part, EXTRACTION_PROMPT],
         config={
             "response_mime_type": "application/json",
-            "response_schema": INVOICE_RESPONSE_SCHEMA,
+            "response_schema": INVOICE_RESPONSE_SCHEMA
         },
     )
 
@@ -132,7 +132,7 @@ def _infer_mime_type(file_path: Path) -> str:
         ".png": "image/png",
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
-        ".webp": "image/webp",
+        ".webp": "image/webp"
     }
     if suffix not in mime_map:
         raise ValueError(
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     pdf_files = list(sample_directory.iterdir())
 
     if not pdf_files:
-        print(f"No sample file found at {sample_directory} — add one to test extraction.")
+        print(f"No sample file found at {sample_directory}, add one to test extraction.")
     else:
         for sample_path in pdf_files:
             print(sample_path.name)

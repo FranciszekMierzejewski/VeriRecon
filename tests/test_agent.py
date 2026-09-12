@@ -8,6 +8,7 @@ so expect the duplicate-pair case to only behave correctly on a fresh run agains
 """
 
 import json
+from typing import Any
 
 from agent.main_agent import reconcile_invoice
 
@@ -16,7 +17,7 @@ def run_full_suite() -> None:
     with open("data/demo_invoices.json") as f:
         invoices = json.load(f)
 
-    results: list[dict[str, str]] = []
+    results: list[dict[str, Any]] = []
     correct = 0
 
     for invoice in invoices:
@@ -31,7 +32,7 @@ def run_full_suite() -> None:
             "expected": expected,
             "decision": decision,
             "flags": classification.get("flags", []),
-            "correct": is_correct,
+            "correct": is_correct
         })
 
     print(f"\n{'Invoice':<12} {'Expected':<16} {'Decision':<16} {'Flags':<25} {'Match'}")

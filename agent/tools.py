@@ -18,6 +18,9 @@ def lookup_po(po_reference: str) -> dict[str, Any]:
     Bool flag on 'found', set to false if no matching document exists, for invoices with missing/manipulated PO reference.
     """
 
+    if not po_reference:
+        return {"found" : False, "po_reference" : po_reference}
+
     document_reference = database.collection("purchase_orders").document(po_reference)
     document = document_reference.get() # DocumentSnapshot object wraps metadata (exists, id, ref) and document data
 
@@ -65,7 +68,7 @@ def get_vendor_history(supplier: str) -> dict[str, Any]:
         "invoice_count": history_data.get("invoice_count"),
         "past_flags_count": history_data.get("past_flags_count"),
         "ytd_spend": history_data.get("ytd_spend"),
-        "payment_terms": history_data.get("payment_terms"),
+        "payment_terms": history_data.get("payment_terms")
     }
 
 
@@ -153,7 +156,7 @@ def check_fuzzy_duplicates(
     if invoice_dt is None:
         return {
             "is_fuzzy_duplicate": False,
-            "error": f"could not parse invoice_date '{invoice_date}' as DD/MM/YYYY",
+            "error": f"could not parse invoice_date '{invoice_date}' as DD/MM/YYYY"
         }
 
     query = database.collection("processed_invoices").where(
@@ -193,7 +196,7 @@ def check_fuzzy_duplicates(
         fuzzy_matches.append({
             "invoice_id": candidate.id,
             "amount_diff_gbp": round(amount_diff, 2),
-            "date_diff_days": date_diff_days,
+            "date_diff_days": date_diff_days
         })
 
     if not fuzzy_matches:
@@ -201,5 +204,5 @@ def check_fuzzy_duplicates(
 
     return {
         "is_fuzzy_duplicate": True,
-        "matches": fuzzy_matches,
+        "matches": fuzzy_matches
     }

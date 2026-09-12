@@ -98,7 +98,7 @@ def _make_logging_tools(invoice_number: str) -> list[Any]:
         _log(
             "check_exact_duplicate",
             {"supplier": supplier, "invoice_amount": invoice_amount, "invoice_date": invoice_date},
-            result,
+            result
         )
         return result
 
@@ -110,7 +110,7 @@ def _make_logging_tools(invoice_number: str) -> list[Any]:
         _log(
             "check_fuzzy_duplicates",
             {"supplier": supplier, "invoice_amount": invoice_amount, "invoice_date": invoice_date},
-            result,
+            result
         )
         return result
 
@@ -129,7 +129,11 @@ def _build_agent(invoice_number: str) -> LlmAgent:
 
 # Coroutine that orchestrates an agent run without blocking thread whilst agent works
 async def _run_agent_async(invoice: dict[str, Any]) -> str:
-    """Run the agent against one invoice, returning its raw final text response."""
+    """Run the agent against one invoice, returning its raw final text response.
+    Creates an in-memory session for an invoice so agent can maintain context during tool-use loop.
+    Sends invoice JSON as user message, streams events from runner.run_async and capture agent's final response.
+    Async to avoid blocking event loop.
+    """
     agent = _build_agent(invoice["invoice_number"])
     session_service = InMemorySessionService()
 
@@ -152,7 +156,7 @@ def _parse_classification(raw_text: str) -> dict[str, Any]:
     Parse the agent's final JSON response. Falls back to a safe Escalate result if parsing fails, 
     rather than crashing the whole pipeline, since unparseable classification should be flagged to human reviewer.
     """
-    cleaned = raw_text.strip()
+    cleaned = raw_text.strip() # strip markdown if aroud JSON
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`")
         if cleaned.startswith("json"):
@@ -166,29 +170,50 @@ def _parse_classification(raw_text: str) -> dict[str, Any]:
             "confidence": 0.0,
             "reasoning": "Agent response could not be parsed as valid JSON.",
             "flags": ["unparseable_response"],
-            "raw_response": raw_text,
+            "raw_response": raw_text
         }
 
 
 def _write_processed_invoice(invoice: dict[str, Any], classification: dict[str, Any]) -> None:
     """
-    Persist the processed invoice + classification. This populates processed_invoices, which 
+    Persist the processed invoice and classification. This populates processed_invoices with originals, which 
     check_exact_duplicate/check_fuzzy_duplicates depend on without which duplicate detection has 
     nothing to compare future invoices against.
     """
     database.collection("processed_invoices").document(invoice["invoice_number"]).set({
-        **invoice,
+        **invoice, # unpack dictionary
         "classification": classification,
-        "processed_at": datetime.now(timezone.utc).isoformat(),
+        "processed_at": datetime.now(timezone.utc).isoformat()
     })
 
 
-def reconcile_invoice(invoice: dict[str, Any]) -> dict[str, Any]:
-    """Run the agent against one invoice, persist the result, return the classification."""
-    raw_text = asyncio.run(_run_agent_async(invoice))
+async def reconcile_invoice_async(invoice: dict[str, Any]) -> dict[str, Any]:
+    """
+    Run an agent, parse its JSON, perist result. When no event loop running.
+
+    Async version of reconcile_invoice, for use inside an already-running
+    event loop, e.g. FastAPI/uvicorn. The sync reconcile_invoice()
+    wraps this with asyncio.run(), which only works when no event loop is
+    already active. calling it from inside an async FastAPI endpoint
+    raises 'asyncio.run() cannot be called from a running event loop'.
+    """
+
+    
+    # Start or continue the asynchronous operation.
+    # Pause reconcile_invoice_async while _run_agent_async is waiting.
+    # Allow the event loop to process other work.
+    # Resume once _run_agent_async completes.
+    # Assign its result to raw_text.
+
+    raw_text = await _run_agent_async(invoice)
     classification = _parse_classification(raw_text)
     _write_processed_invoice(invoice, classification)
     return classification
+
+
+def reconcile_invoice(invoice: dict[str, Any]) -> dict[str, Any]:
+    """Sync entry point for scripts/tests with no event loop already running."""
+    return asyncio.run(reconcile_invoice_async(invoice))
 
 
 if __name__ == "__main__":

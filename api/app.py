@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
-from agent.main_agent import reconcile_invoice
+from agent.main_agent import reconcile_invoice_async
 from extraction.gemini_extract import extract_invoice_from_file
 from api.schemas import ReconciliationResponse
 
@@ -64,11 +64,11 @@ async def reconcile_invoice_upload(file: UploadFile = File(...)):
             logger.warning("Extraction missing required fields: %s", missing)
             raise HTTPException(
                 status_code=422,
-                detail=f"Extraction did not return required fields: {sorted(missing)}",
+                detail=f"Extraction did not return required fields: {sorted(missing)}"
             )
 
         try:
-            classification = reconcile_invoice(extracted_invoice)
+            classification = await reconcile_invoice_async(extracted_invoice)
         except Exception:
             # Agent/Firestore/Gemini failures during reconciliation 
             logger.exception("Reconciliation failed after successful extraction")
@@ -76,7 +76,7 @@ async def reconcile_invoice_upload(file: UploadFile = File(...)):
 
         return ReconciliationResponse(
             invoice=extracted_invoice,
-            classification=classification,
+            classification=classification
         )
 
     except HTTPException:  # keep original error, not overwritten
