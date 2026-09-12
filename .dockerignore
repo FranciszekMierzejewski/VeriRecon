@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.git/
+.venv/
+.vscode/
+data/sample_pdfs/
+data/demo_invoices.json
+dashboard/
+tests/
+scripts/
+.env
+.env.example
+.gitignore
+README.md
+LICENSE

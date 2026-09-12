@@ -1,5 +1,9 @@
+google-cloud-firestore 
+google-genai 
+google-adk
+python-dotenv
 fastapi
 uvicorn
 python-multipart
-google-adk
 streamlit
+pydantic 

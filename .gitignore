@@ -78,6 +78,7 @@ config.local.json
 serviceAccountKey.json
 *-service-account.json
 *.key
+key.json
 .env.local
 .env.*.local
 
