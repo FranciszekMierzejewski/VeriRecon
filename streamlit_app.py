@@ -22,6 +22,10 @@ st.set_page_config(
 
 st.title("VeriRecon - Invoice Reconciliation Agent")
 
+with st.expander("What do the three outcomes mean?"):
+    st.write("**Auto Approve** - PO matched, amount within tolerance, no duplicates. No human review needed.")
+    st.write("**Flag For Review** - PO matched but the amount is outside tolerance, or the invoice's own numbers don't add up. A human should double-check.")
+    st.write("**Escalate** - no matching PO found, or a duplicate/near-duplicate was detected. Treat with more scrutiny.")
 
 def render_decision_banner(decision: str) -> None:
     """

@@ -64,6 +64,17 @@ Respond with ONLY a single JSON object, no other text, in this exact form:
 """.strip()
 
 
+def _clear_reasoning_chain(invoice_number: str) -> None:
+    """
+    Delete any existing reasoning-chain steps for this invoice before a new run starts. 
+    Without this, re-processing the same invoice_number appends the new run's steps onto the old ones, 
+    making the audit trail unreadable 
+    """
+    steps_ref = database.collection("reasoning_chains").document(invoice_number).collection("steps")
+    for doc in steps_ref.stream():
+        doc.reference.delete()
+
+
 def _make_logging_tools(invoice_number: str) -> list[Any]:
     """
     Wrap each reconciliation tool so every call is logged to Firestore's reasoning_chains collection, along with invoice number.
@@ -237,6 +248,7 @@ async def reconcile_invoice_async(invoice: dict[str, Any]) -> dict[str, Any]:
     # Resume once _run_agent_async completes.
     # Assign its result to raw_text.
 
+    _clear_reasoning_chain(invoice["invoice_number"])
     raw_text = await _run_agent_async(invoice)
     classification = _parse_classification(raw_text)
     _write_processed_invoice(invoice, classification)
