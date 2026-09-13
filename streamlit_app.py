@@ -13,7 +13,7 @@ from db.firestore_client import get_client
 
 load_dotenv()
 
-API_URL = os.environ.get("VERIRECON_API_URL", "http://127.0.0.1:8000")
+API_URL = os.environ.get("VERIRECON_API_URL") or st.secrets.get("VERIRECON_API_URL", "http://127.0.0.1:8000")
 database = get_client()
 
 st.set_page_config(
