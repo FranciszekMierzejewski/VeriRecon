@@ -9,8 +9,7 @@ COPY agent/ ./agent/
 COPY api/ ./api/
 COPY extraction/ ./extraction/
 COPY db/ ./db/
-COPY key.json ./key.json
 
-EXPOSE 80
+EXPOSE 8080
 
-CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "80"]
+CMD exec uvicorn api.app:app --host 0.0.0.0 --port ${PORT:-8080}
