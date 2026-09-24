@@ -7,7 +7,7 @@ VeriRecon ingests a supplier invoice (PDF or image), extracts its structured dat
 ## Live links
  
 - **Dashboard:** [verirecon.streamlit.app](https://verirecon.streamlit.app/)
-- **API (Swagger UI):** [verirecon-api.switzerlandnorth.azurecontainer.io/docs](http://verirecon-api.switzerlandnorth.azurecontainer.io/docs)
+- **API (Swagger UI):** [https://verirecon-api-849632669512.europe-west1.run.app/docs](https://verirecon-api-849632669512.europe-west1.run.app/docs)
 - **Demo video:** see `demonstrations/` (Gemini extraction walkthrough)
 ## Why an agent, not a script
  
@@ -38,7 +38,7 @@ Classification: Auto Approve / Flag For Review / Escalate
       └──► Firestore: reasoning_chains (every tool call, in order)
 ```
  
-**Backend:** FastAPI, containerized and deployed on Azure Container Instances.
+**Backend:** FastAPI, containerized and deployed on Google Cloud Run.
 **Frontend:** Streamlit dashboard (upload + review queue), deployed on Streamlit Community Cloud.
 **Data:** Firestore (purchase orders, vendor history, processed invoices, reasoning chains).
  
@@ -79,10 +79,11 @@ VeriRecon/
 ├── db/
 │   ├── __init__.py
 │   └── firestore_client.py    Shared Firestore client factory,
-│                              handles both local ADC and Streamlit
-│                              Cloud service-account-secret auth
+│                              handles local ADC, Cloud Run's built-in
+│                              service identity, and Streamlit Cloud's
+│                              service-account-secret auth
 │
-├── demonstrations/            Demo video(s) 
+├── demonstrations/            Demo video(s)
 │
 ├── extraction/
 │   ├── __init__.py
@@ -93,15 +94,12 @@ VeriRecon/
 │   └── test_agent.py          End-to-end suite: runs demo_invoices.json
 │                              through the agent, checks against expected outcomes
 │
-│
 ├── streamlit_app.py            Review dashboard: upload + reasoning-chain viewer
 ├── Dockerfile                  API container image definition
 ├── .dockerignore
 ├── .env / .env.example         Local environment config (GCP project, API URL)
 ├── .gitignore
 ├── requirements.txt
-├── key.json                    GCP service account credentials (gitignored,
-│                                included in the Docker build context only)
 └── README.md
 ```
  
@@ -124,7 +122,7 @@ Requires a `.env` file (see `.env.example`) with GCP project/location config, an
  
 ## Deployment
  
-- **API:** Dockerized, pushed to Azure Container Registry, running on Azure Container Instances (`switzerlandnorth`, due to Azure for Students' region allowlist). Authenticates to GCP via a dedicated service account key (`verirecon-sa`) baked into the image.
+- **API:** Dockerized, built and deployed via `gcloud builds submit` + `gcloud run deploy` to Google Cloud Run. Authenticates to GCP using Cloud Run's default compute service account (IAM-bound to Firestore and Vertex AI roles) — no credentials file needed in the image. Originally deployed on Azure Container Instances; migrated to Cloud Run after exhausting Azure trial credits, since Cloud Run scales to zero and incurs no cost while idle.
 - **Dashboard:** Deployed on Streamlit Community Cloud, reading the API URL and GCP service account credentials from Streamlit secrets rather than a local `.env`.
 ## Testing
  
@@ -134,4 +132,3 @@ Requires a `.env` file (see `.env.example`) with GCP project/location config, an
  
 - The first invoice in a duplicate pair is correctly Auto Approved, since nothing is wrong with it in isolation — only the second occurrence can be detected as a duplicate, once the first is on record.
 - `check_exact_duplicate` and `check_fuzzy_duplicates` compare against `processed_invoices`, so duplicate detection only activates for invoices processed after the system went live — it has no visibility into paper/legacy records outside this system.
-- The API currently serves plain HTTP (no TLS) — Azure Container Instances doesn't provide managed HTTPS out of the box, and adding it (via Front Door, Application Gateway, or a reverse-proxy sidecar) was out of scope for this build.
